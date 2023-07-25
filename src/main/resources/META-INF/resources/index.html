@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>qchat4j</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+      integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  </head>
+
+  <body>
+    <div id="session-enter" class="container my-3">
+      <h1 class="m-4">Sign in to session</h1>
+      <form>
+        <div class="form-floating mb-3">
+          <input type="text" class="form-control" id="session-id-input" placeholder="">
+          <label for="session-id-input">New/shared Session ID</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input type="text" class="form-control" id="user-name-input" placeholder="">
+          <label for="user-name-input">User name</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input type="password" class="form-control" id="password-input" placeholder="">
+          <label for="password-input">Password</label>
+        </div>
+        <button id="session-form-submit" type="submit" class="btn btn-primary">Submit</button>
+      </form>
+    </div>
+    <div id="main-chat-session" class="container my-3" style="display: none;">
+      <h1 id="chat-room-title" class="m-4"></h1>
+      <div>
+        <form>
+          <div class="form-floating mb-3">
+            <textarea type="text" class="form-control" id="new-chat-input" placeholder="" style="min-height: 7rem;"></textarea>
+            <label for="new-chat-input">Enter your chat</label>
+          </div>
+          <button id="chat-form-submit" type="submit" class="btn btn-primary">Send</button>
+        </form>
+      </div>
+      <div id="chat-box" class="m-3">
+        <template id="chat-item-template">
+          <div class="row">
+            <div class="card float-start m-2">
+              <div class="card-body">
+                <h5 id="username" class="card-title text-primary"></h5>
+                <pre id="message" class="card-text"></pre>
+                <small id="instant" class="card-text text-end text-muted"></small>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
+      crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js"
+      integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=" crossorigin="anonymous"></script>
+    <script>
+      let user = {
+        username: null,
+        password: null
+      }
+      let chat = {
+        ws: null,
+        onlogin: () => {
+          chat.ws.onmessage = (event) => {
+            if (event.data === "success") {
+              chat.ws.onmessage = chat.onmessage;
+              chat.ws.send("__get_all__");
+            } else {
+              console.log("login attempt failed");
+            }
+          }
+          chat.ws.send(`__join_as__\n${JSON.stringify(user)}`);
+        },
+        onmessage: (event) => {
+          console.log(event.data);
+          let message = JSON.parse(event.data);
+          let chatItem = $(`#chat-item-id-${message.id}`);
+          if (chatItem.length) chatItem.remove();
+          chatItem = $($("#chat-item-template").html());
+          chatItem.attr("id", `chat-item-id-${message.id}`);
+          chatItem.find("#username").text(message.username);
+          chatItem.find("#message").text(message.message);
+          chatItem.find("#instant").text(message.instant);
+          chatItem.hide();
+          $("#chat-box").prepend(chatItem);
+          chatItem.fadeIn(300);
+        }
+      }
+
+      $("#session-form-submit").on("click", (e) => {
+        e.preventDefault();
+        user.username = $("#user-name-input").val();
+        user.password = $("#password-input").val();
+        let chatroom = $("#session-id-input").val();
+        if (chat.ws !== null) chat.ws.close();
+        chat.ws = new WebSocket(`ws://localhost:8080/api/chat-session/${chatroom}`);
+        chat.ws.onopen = chat.onlogin;
+        $("#session-enter").hide();
+        $("#main-chat-session").show();
+        $("#chat-room-title").text(`Chat room: ${chatroom}`);
+      });
+
+      $("#chat-form-submit").on("click", (e) => {
+        e.preventDefault();
+        let message = $("#new-chat-input").val();
+        chat.ws.send(`__message__\n${message}`);
+        $("#new-chat-input").val("");
+      });
+    </script>
+  </body>
+
+</html>
