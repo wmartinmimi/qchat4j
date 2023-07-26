@@ -19,10 +19,12 @@ public class ChatSession {
 
     private final ConcurrentHashMap<Session, UserEntry> users;
     private final ObjectMapper mapper;
+    private final String sessionId;
 
-    public ChatSession(ObjectMapper mapper) {
+    public ChatSession(String sessionId, ObjectMapper mapper) {
         users = new ConcurrentHashMap<>(2);
 
+        this.sessionId = sessionId;
         this.mapper = mapper;
     }
 
@@ -47,7 +49,7 @@ public class ChatSession {
                         logger.info("User {} joined", joinAs.username);
                         users.replace(session, user);
                         session.getAsyncRemote().sendText("success");
-                        broadcast(new Message("System", MessageFormat.format("User {0} has joined", joinAs.username), Instant.now()));
+                        broadcast(new Message("System", MessageFormat.format("User {0} has joined", joinAs.username), sessionId, Instant.now()));
                     } else {
                         logger.info("User {} entered incorrect password", joinAs.username);
                         session.getAsyncRemote().sendText("invalid password");
@@ -58,7 +60,7 @@ public class ChatSession {
             }
             case "__get_all__" -> {
                 try {
-                    var messages = Message.listAll();
+                    var messages = Message.listAllFromSession(sessionId);
                     for (var message1 : messages) {
                         session.getAsyncRemote().sendText(mapper.writeValueAsString(message1));
                     }
@@ -69,7 +71,7 @@ public class ChatSession {
             case "__message__" -> {
                 var instant = Instant.now();
                 try {
-                    broadcast(new Message(users.get(session).username, data[1], instant));
+                    broadcast(new Message(users.get(session).username,  data[1], sessionId, instant));
                 } catch (Exception e) {
                     logger.error("Transaction failed", e);
                 }
@@ -88,7 +90,7 @@ public class ChatSession {
     void leave(Session session) {
         var user = users.get(session);
         if (user != null) {
-            broadcast(new Message("System", MessageFormat.format("User {0} has left", user.username), Instant.now()));
+            broadcast(new Message("System", MessageFormat.format("User {0} has left", user.username), sessionId, Instant.now()));
         }
         users.remove(session);
     }
@@ -96,9 +98,7 @@ public class ChatSession {
     private void broadcast(Message message) {
         try {
             String data = mapper.writeValueAsString(message);
-            users.keySet().forEach(session -> {
-                session.getAsyncRemote().sendText(data);
-            });
+            users.keySet().forEach(session -> session.getAsyncRemote().sendText(data));
         } catch (JsonProcessingException e) {
             logger.error("message parsing error", e);
         }

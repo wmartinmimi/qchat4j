@@ -16,7 +16,7 @@ public class ChatSessionEndpoint {
 
     ConcurrentHashMap<String, ChatSession> sessions;
 
-    private static final ChatSession emptySession = new ChatSession(null);
+    private static final ChatSession emptySession = new ChatSession(null, null);
 
     @Inject
     public ChatSessionEndpoint() {
@@ -28,7 +28,7 @@ public class ChatSessionEndpoint {
 
     @OnOpen
     public void onOpen(Session session, @PathParam("session_id") String sessionId) {
-        sessions.putIfAbsent(sessionId, new ChatSession(mapper));
+        sessions.putIfAbsent(sessionId, new ChatSession(sessionId, mapper));
         sessions.get(sessionId).join(session);
     }
 
